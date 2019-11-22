@@ -8,7 +8,7 @@ Created on Tue Nov 19 16:47:45 2019
 
 import tkinter as tk 
 import tkinter.ttk as ttk
-
+from tkinter import messagebox as tkm
 
 class Student():
     def __init__(self, name, family_name, group):
@@ -55,7 +55,12 @@ class StudentList():
         print(student)
         print(student.getDict())
         print("erfolgreich hinzugefügt")
-        
+    
+    def delStudent(self, student):
+        s = student
+        self.l.remove(s)
+        print(s.name + " entfernt.")
+    
     def getList(self):
         return self.l
         
@@ -68,6 +73,92 @@ class StudentList():
                 pass
         return -1
 
+class ReallyDeleteDialog(tk.Toplevel):
+    def __init__(self, master, controller, selected, title = "Löschen?"):
+        super().__init__(master)
+        self.transient(master)
+        self.master = master
+        self.con = controller
+        self.sel = selected
+        
+        print("Löschen-Dialog")
+        
+        body = tk.Frame(self)
+        self.initial_focus = self.getFocusElement(body)
+        body.pack(padx=5, pady=5)
+        
+        self.infoBox()
+        self.buttonBox()
+        self.grab_set()
+        
+        if not self.initial_focus:
+            self.initial_focus = self
+        
+        self.protocol("WM_DELETE_WINDOW", self.cancel)
+        self.geometry("+%d+%d" % (master.winfo_rootx()+50,
+                                  master.winfo_rooty()+50))
+        self.initial_focus.focus_set()
+        
+        self.wait_window(self)
+        
+    def getFocusElement(self, body):
+        element = body
+        return element
+    
+    def infoBox(self):
+        box = tk.Frame(self)
+        
+        studentlist = self.con.sl.getList()
+        student = studentlist[self.sel]
+        name = student.getName()
+        fname = student.getFamilyName()
+        
+        ltext = " ".join([name, fname]) + " wirklich löschen?"
+        
+        self.l_name = tk.Label(box, text=ltext)
+        self.l_name.grid(row=0, column=0, sticky="w")
+        
+        box.pack()
+    
+    def buttonBox(self):
+        box = tk.Frame(self)
+
+        w = tk.Button(box, text="OK", width=10, command=self.ok, default=tk.ACTIVE)
+        w.pack(side=tk.LEFT, padx=5, pady=5)
+        w = tk.Button(box, text="Cancel", width=10, command=self.cancel)
+        w.pack(side=tk.LEFT, padx=5, pady=5)
+
+        self.bind("<Return>", self.ok)
+        self.bind("<Escape>", self.cancel)
+
+        box.pack()
+    
+    def ok(self, event=None):
+        if not self.validate():
+            self.initial_focus.focus_set() # put focus back
+            return -1
+        else:
+            pass
+        
+        self.withdraw()
+        self.update_idletasks()
+        self.apply()
+        
+        self.cancel()
+        
+    def cancel(self, event=None):
+        # self.con.app.studentlist.item(selected_id, tags="")
+        # put focus back to the parent window
+        self.master.focus_set()
+        self.destroy()
+    
+    def validate(self):
+        return True
+        
+    def apply(self):
+        self.con.doDeleteStudent(self.sel)
+        return True    
+    
 
 class NewStudentDialog(tk.Toplevel):
     def __init__(self, master, controller, title = "Neuer Schüler"):
@@ -107,6 +198,7 @@ class NewStudentDialog(tk.Toplevel):
         self.l_name = tk.Label(box, text="Vorname:")
         self.l_name.grid(row=0, column=0, sticky="w")
         self.e_name = tk.Entry(box, highlightcolor="blue", background="white")
+        self.initial_focus = self.getFocusElement(self.e_name)
         self.e_name.grid(row=0, column=1)
         
         self.l_fname = tk.Label(box, text="Nachname:")
@@ -182,7 +274,7 @@ class Controller():
 
     def addToStudentlist(self, student):
         iid = self.sl.l.index(student)
-        values = [student.getName(), student.getFamilyName(), student.getGroup()]
+        values = [student.getFamilyName(), student.getName(), student.getGroup()]
         self.app.studentlist.insert(parent="", index="end", text=iid, iid=iid, values=values)
 
     def editStudent(self, event=None):
@@ -190,9 +282,44 @@ class Controller():
         pass
         
     def delStudent(self, event=None):
+        selected = self.app.studentlist.selection()
+        try:
+            selected_id = int(selected[0])
+        except:
+            tkm.showerror(title="Fehler", message="Nichts zu löschen ausgewählt.")
+            return False
+            
+        self.app.studentlist.item(selected_id, tags=("del"))
+        print(self.app.studentlist.tag_has("del"))
+        #self.app.studentlist.tag_configure("del", selectbackground="red")
+        self.app.studentlist.tag_configure("del", background="yellow")
+        self.app.studentlist.configure()
+        #itemClicked = self.app.studentlist.focus()
+        #self.app.studentlist.tag_bind('del', '<1>', itemClicked)
+        print(self.app.studentlist.tag_configure("del"))
+        print(selected_id)
         print("Löschen")
-        pass
-        
+        really = ReallyDeleteDialog(master=self.app, controller=self, selected=selected_id)
+    
+    def doDeleteStudent(self, num):
+        student = self.sl.getList()[num]
+        self.sl.delStudent(student)
+        self.app.studentlist.delete(num)
+        self.refillTreeView()
+    
+    def refillTreeView(self):
+        slTV = self.app.studentlist
+        print(slTV.get_children())
+        for item in slTV.get_children():
+            slTV.delete(item)
+        #map(slTV.delete, slTV.get_children())
+        self.fillTreeView()
+    
+    def fillTreeView(self):
+        sl = self.sl
+        for student in sl.getList():
+            self.addToStudentlist(student)
+    
     def saveStudent(self, event=None):
         print("Speichern")
         pass
@@ -244,5 +371,6 @@ class Example(tk.Frame):
 
 if __name__ == "__main__":
     root = tk.Tk()
+    print(root.tk.call('info', 'patchlevel'))
     Example(root).pack(fill="both", expand=True)
     root.mainloop()

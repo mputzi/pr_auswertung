@@ -10,6 +10,8 @@ import tkinter as tk
 import tkinter.ttk as ttk
 from tkinter import messagebox as tkm
 
+import pr_csv
+
 #-----------------------------------------------------------------------
 # Fix for tk 8.6.9
 
@@ -93,11 +95,17 @@ class StudentList():
     def delStudentById(self, sid):
         try:
             del self.l[sid]
-            print("Nummer " + int(sid) + " entfernt.")
+            print("Nummer " + str(sid) + " entfernt.")
         except:
             print("Nichts gelöscht.")
             return False
         return True
+        
+    def delAllStudents(self):
+        for sid in range(len(self.l)):
+            self.delStudentById(0)
+        if len(self.l) == 0:
+            print("Alle Schüler gelöscht.")
     
     def getList(self):
         return self.l
@@ -518,16 +526,35 @@ class Controller():
         sl = self.sl
         for student in sl.getList():
             self.addToStudentlist(student)
+
+    def loadStudent(self, event=None):
+        print("Laden")
+        c = pr_csv.MyCSV()
+        result = c.read()
+        #print(result)
+        
+        self.sl.delAllStudents()
+        self.refillTreeView()
+        
+        for entry in result:
+            s = Student(name=entry["Vorname"],
+                        family_name=entry["Nachname"],
+                        group=entry["Gruppe"])
+            self.sl.appendStudent(s)
+            
+        self.refillTreeView()
     
     def saveStudent(self, event=None):
         print("Speichern")
+        c = pr_csv.MyCSV()
+        c.write(self.sl.getList())
         pass
 
 #
 # Main App
 #
 
-class Example(tk.Frame):
+class Application(tk.Frame):
 
     def __init__(self, parent):
         tk.Frame.__init__(self, parent)
@@ -537,21 +564,25 @@ class Example(tk.Frame):
         
         buttonFrame = tk.Frame(self)
         
+        self.loadStudentButton = tk.Button(buttonFrame, text="Laden")
+        self.loadStudentButton["command"] = self.con.loadStudent
+        self.loadStudentButton.grid(row=0, column=0)
+        
         self.newStudentButton = tk.Button(buttonFrame, text="Neuer Schüler")
         self.newStudentButton["command"] = self.con.newStudent
-        self.newStudentButton.grid(row=0, column=0)
+        self.newStudentButton.grid(row=0, column=1)
         
         self.editStudentButton = tk.Button(buttonFrame, text="Bearbeiten")
         self.editStudentButton["command"] = self.con.editStudent
-        self.editStudentButton.grid(row=0, column=1)
+        self.editStudentButton.grid(row=0, column=2)
         
         self.delStudentButton = tk.Button(buttonFrame, text="Löschen")
         self.delStudentButton["command"] = self.con.delStudent
-        self.delStudentButton.grid(row=0, column=2)
+        self.delStudentButton.grid(row=0, column=3)
         
         self.writeStudentButton = tk.Button(buttonFrame, text="Speichern")
         self.writeStudentButton["command"] = self.con.saveStudent
-        self.writeStudentButton.grid(row=0, column=3)
+        self.writeStudentButton.grid(row=0, column=4)
         
         buttonFrame.grid(row=0, column=0, sticky="we")
         
@@ -562,6 +593,7 @@ class Example(tk.Frame):
         self.studentlist.heading("#3", text="Gruppe")
         self.studentlist.grid(row=1, column=0)
         
+        self.parent.bind("o", self.con.loadStudent)
         self.parent.bind("n", self.con.newStudent)
         self.parent.bind("e", self.con.editStudent)
         self.parent.bind("<Delete>", self.con.delStudent)
@@ -574,5 +606,5 @@ if __name__ == "__main__":
     style = ttk.Style(root)
     style.map('Treeview', foreground=fixed_map('foreground'),
      background=fixed_map('background'))
-    Example(root).pack(fill="both", expand=True)
+    Application(root).pack(fill="both", expand=True)
     root.mainloop()

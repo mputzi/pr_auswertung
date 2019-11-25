@@ -15,7 +15,7 @@ import pr_csv
 #-----------------------------------------------------------------------
 # Fix for tk 8.6.9
 
-def fixed_map(option):
+def fixed_map(style, option):
     # Fix for setting text colour for Tkinter 8.6.9
     # From: https://core.tcl.tk/tk/info/509cafafae
     #
@@ -28,6 +28,8 @@ def fixed_map(option):
       elm[:2] != ('!disabled', '!selected')]
 
 #-----------------------------------------------------------------------
+
+myfont = "Helvetica 14"
 
 class Student():
     def __init__(self, name, family_name, group):
@@ -71,8 +73,8 @@ class StudentList():
         
     def appendStudent(self, student):
         self.l.append(student)
-        print(student)
-        print(student.getDict())
+        #print(student)
+        #print(student.getDict())
         print("erfolgreich hinzugefügt")
     
     def insertStudentAt(self, index, student):
@@ -118,6 +120,15 @@ class StudentList():
             else:
                 pass
         return -1
+    
+    def sortListByName(self):
+        sByName = sorted(self.l, key=lambda x: x.name, reverse=False)
+        self.l = sorted(sByName, key=lambda x: x.family_name, reverse=False)
+        return True
+    
+    def sortListByGroup(self):
+        self.l.sort(key=lambda x: x.group, reverse=False)
+        return True
 
 class ReallyDeleteDialog(tk.Toplevel):
     def __init__(self, master, controller, selected_id, title = "Löschen?"):
@@ -320,18 +331,18 @@ class EditStudentDialog(tk.Toplevel):
         
         self.entryBox()
         self.buttonBox()
-        self.grab_set()
         
+        self.wait_visibility()
+        self.grab_set()
         if not self.initial_focus:
-            self.initial_focus = self
+            self.initial_focus = self.getFocusElement(body)
         
         self.protocol("WM_DELETE_WINDOW", self.cancel)
         self.geometry("+%d+%d" % (master.winfo_rootx()+50,
                                   master.winfo_rooty()+50))
         self.initial_focus.focus_set()
         
-        self.wait_window(self)
-        
+        self.wait_window(self)        
     
     def getFocusElement(self, body):
         element = body
@@ -444,7 +455,21 @@ class Controller():
     def addToStudentlist(self, student):
         iid = self.sl.l.index(student)
         values = [student.getFamilyName(), student.getName(), student.getGroup()]
-        self.app.studentlist.insert(parent="", index="end", text=iid, iid=iid, values=values)
+        if iid % 2 == 0:
+            tag = "even"
+        elif iid % 2 == 1:
+            tag = "odd"
+        else:
+            pass
+        self.app.studentlist.insert(parent="", index="end", text=iid, iid=iid, values=values, tags=tag)
+
+    def sortByName(self):
+        self.sl.sortListByName()
+        self.refillTreeView()
+        
+    def sortByGroup(self):
+        self.sl.sortListByGroup()
+        self.refillTreeView()
 
     def editStudent(self, event=None):
         print("Bearbeiten")
@@ -453,7 +478,7 @@ class Controller():
         try:
             selected_id = int(selected[0])
         except:
-            tkm.showhint(title="Hinweis", message="Nichts zum Bearbeiten ausgewählt.")
+            tkm.showinfo(title="Hinweis", message="Nichts zum Bearbeiten ausgewählt.")
             return False
         
         self.markEdit(selected_id)
@@ -485,14 +510,24 @@ class Controller():
         # Un-Mark from deletion
         tree.selection_toggle(selected_id)    
         tree.tag_configure("edit", background="lightgrey")
-        tree.item(selected_id, tags=(""))
+        if selected_id % 2 == 0:
+            tree.item(selected_id, tags=("even"))
+        elif selected_id % 2 == 1:
+            tree.item(selected_id, tags=("odd"))
+        else:
+            tree.item(selected_id, tags=(""))
 
     def unmarkEditNoChange(self, selected_id):
         tree = self.app.studentlist
         # Un-Mark from deletion
         tree.selection_toggle(selected_id)    
         tree.tag_configure("edit", background="white")
-        tree.item(selected_id, tags=(""))
+        if selected_id % 2 == 0:
+            tree.item(selected_id, tags=("even"))
+        elif selected_id % 2 == 1:
+            tree.item(selected_id, tags=("odd"))
+        else:
+            tree.item(selected_id, tags=(""))
     
     def markDeletion(self, selected_id):
         tree = self.app.studentlist
@@ -506,7 +541,12 @@ class Controller():
         # Un-Mark from deletion
         tree.selection_toggle(selected_id)    
         tree.tag_configure("del", background="white")
-        tree.item(selected_id, tags=(""))
+        if selected_id % 2 == 0:
+            tree.item(selected_id, tags=("even"))
+        elif selected_id % 2 == 1:
+            tree.item(selected_id, tags=("odd"))
+        else:
+            tree.item(selected_id, tags=(""))
         
     def doDeleteStudent(self, num):
         student = self.sl.getList()[num]
@@ -516,7 +556,7 @@ class Controller():
     
     def refillTreeView(self):
         slTV = self.app.studentlist
-        print(slTV.get_children())
+        #print(slTV.get_children())
         for item in slTV.get_children():
             slTV.delete(item)
         #map(slTV.delete, slTV.get_children())
@@ -560,9 +600,24 @@ class Application(tk.Frame):
         tk.Frame.__init__(self, parent)
         self.parent = parent
         
+        top=self.winfo_toplevel()
+        top.rowconfigure(0, weight=1)
+        top.columnconfigure(0, weight=1)
+        #self.rowconfigure(0, weight=1)
+        #self.rowconfigure(1, weight=1)
+        self.rowconfigure(2, weight=1)
+        self.rowconfigure(3, weight=1)
+        self.columnconfigure(0, weight=1)
+        
+        self.grid(sticky=tk.N+tk.S+tk.E+tk.W)
+        
         self.con = Controller(self)
+    
+        self.students_title = tk.Label(self, text="Schülererfassung", font=myfont)
+        self.students_title.grid(row=0, column=0, sticky = "nws")
         
         buttonFrame = tk.Frame(self)
+        #buttonFrame.columnconfigure(0, weight=1)
         
         self.loadStudentButton = tk.Button(buttonFrame, text="Laden")
         self.loadStudentButton["command"] = self.con.loadStudent
@@ -584,14 +639,49 @@ class Application(tk.Frame):
         self.writeStudentButton["command"] = self.con.saveStudent
         self.writeStudentButton.grid(row=0, column=4)
         
-        buttonFrame.grid(row=0, column=0, sticky="we")
+        buttonFrame.grid(row=1, column=0, sticky="nswe")
         
-        self.studentlist = ttk.Treeview(self, columns=["ID","Name","Vorname","Gruppe"], padding=2, selectmode="browse")
+        self.studentlistFrame = tk.Frame(self, cursor="hand1")
+        self.studentlistFrame.columnconfigure(0, weight=2)
+        self.studentlistFrame.rowconfigure(0, weight=1)
+        
+        self.slBottomFrame = tk.Frame(self.studentlistFrame)
+        self.slBottomFrame.grid(row=1,column=0, sticky="we")
+        
+        self.studentlist = ttk.Treeview(self.studentlistFrame, columns=["ID","Name","Vorname","Gruppe"], padding=2, selectmode="browse")
+        self.studentlist.column("#0", width=40)
+        self.studentlist.column("#1", width=100)
+        self.studentlist.column("#2", width=100)
+        self.studentlist.column("#3", width=50)
         self.studentlist.heading("#0", text="ID")
-        self.studentlist.heading("#1", text="Name")
+        self.studentlist.heading("#1", text="Name", command=self.con.sortByName)
         self.studentlist.heading("#2", text="Vorname")
-        self.studentlist.heading("#3", text="Gruppe")
-        self.studentlist.grid(row=1, column=0)
+        self.studentlist.heading("#3", text="Gruppe", command=self.con.sortByGroup)
+        self.studentlist.tag_configure("odd", background="lightgrey")
+        self.studentlist.tag_configure("even", background="lightblue")
+       # self.studentlist.pack(fill="both")
+        self.studentlist.grid(row=0, column=0, sticky="nwse")
+        
+        self.studentlist.bind("<Double-1>", self.con.editStudent)
+        
+        self.scrbarStudentlist = tk.Scrollbar(self.studentlistFrame, orient=tk.VERTICAL, command=self.studentlist.yview)
+        self.scrbarStudentlist.grid(row=0, column=1, sticky="ns")
+        self.studentlist.configure(yscrollcommand=self.scrbarStudentlist.set)
+        
+        
+        self.scrbarHStudentlist = tk.Scrollbar(self.slBottomFrame, orient=tk.HORIZONTAL, command=self.studentlist.xview)
+        self.scrbarHStudentlist.pack(fill="x", side=tk.BOTTOM, expand=True)
+        self.studentlist.configure(xscrollcommand=self.scrbarHStudentlist.set)
+        
+        self.studentlistFrame.grid(row=2, column=0, sticky="nwse")
+        
+        self.analysis_cv = tk.Canvas(master=self, width = self.studentlistFrame.cget("width"), height=20)
+        self.analysis_cv.grid(row=3, column=0, sticky="nwse")
+        
+        self.status = tk.Frame(self)
+        self.passwordStatus = tk.Label(self.status, text="\u2610 Passwort", font="Helvetica 8", background="red", foreground="white")
+        self.passwordStatus.pack(anchor="e", padx=2)
+        self.status.grid(row=4, column=0, sticky="nwse")
         
         self.parent.bind("o", self.con.loadStudent)
         self.parent.bind("n", self.con.newStudent)

@@ -10,6 +10,7 @@ import tkinter.ttk as ttk
 from tkinter import messagebox as tkm
 from math import ceil
 import students as st
+import pr_exercises as ex
 
 try:
     from pr_pdfwriter import Pdfw
@@ -135,77 +136,7 @@ class GradeKey():
         # Neue Berechnung der Stufen
         self.calc_steps(self.scaletype)
 
-class Exercises():
-    def __init__(self, number):
-        self.names = list()  # Strings
-        self.points = list() # floats
-        self.exercises = dict(zip(self.names, self.points))
-        self.number = number # Anzahl der Aufgaben
-        self.set_number(self.number)
-        self.max = 0
-        self.print_ex()
-    
-    def fill(self, listOfNames, listOfPoints):
-        self.names = listOfNames
-        self.points = listOfPoints # floats!
-        self.update_dict()
-        self.update_max()
-        
-    def set_points(self, num, points):
-        self.points[num-1] = points
-        self.update_max()
-        self.update_dict()
-    
-    def get_points(self, num):
-        return self.points[num-1]
-    
-    def set_name(self, num, name):
-        self.names[num-1] = name
-        self.update_dict()
-    
-    def get_name(self, num):
-        return self.names[num-1]
-        
-    def update_max(self):
-        self.max = sum(self.points)
-        
-    def get_max(self):
-        return self.max
-    
-    def update_dict(self):
-        self.exercises = dict(zip(self.names, self.points))
-    
-    def set_number(self, number):
-        self.number = number
-        # Listen verlängern / kürzen
-        l1 = len(self.names)
-        if l1 > self.number:
-            self.names = self.names[0:number] 
-        elif l1 < self.number:
-            for __ in range(self.number-l1):
-                entry = str(number)
-                self.names.append(entry)
-        else:
-            pass
-        l2 = len(self.points)
-        if l2 > self.number:
-            self.points = self.points[0:number] 
-        elif l2 < self.number:
-            for __ in range(self.number-l2):
-                entry = 1
-                self.points.append(entry)
-        else:
-            pass
-        
-        self.update_max()
-        self.update_dict()
-        self.print_ex()
 
-    def get_number(self):
-        return self.number
-        
-    def print_ex(self):
-        print(self.exercises)
     
 #+++++++++++++++++++++++            
 # Controller
@@ -216,7 +147,7 @@ class Controller():
     def __init__(self, app):
         self.app = app
         self.gk = GradeKey()
-        self.exercises = Exercises(1)
+        self.exercises = ex.Exercises(1)
         self.vali = PR_Validator(self)
     
     # Neue Maximalpunktzahl
@@ -480,17 +411,25 @@ class Controller():
         title = self.app.exam.e_title.get()
         theClass = self.app.exam.e_class.get()
         theDate = self.app.exam.e_date.get()
+        theStudents = self.app.st.con.sl.l
+        
         if self.exercises.max == self.gk.max:
             exercises = self.exercises.exercises
-            doc = LatexW(self.gk.max, self.gk.steps, title=title, the_class = theClass, the_date = theDate, the_ex = exercises)
+            doc = LatexW(self.gk.max, self.gk.steps, title=title,
+                         the_class = theClass, the_date = theDate, the_ex = exercises,
+                         the_students = theStudents)
         else:
-            doc = LatexW(self.gk.max, self.gk.steps, title=title, the_class = theClass, the_date = theDate)
+            doc = LatexW(self.gk.max, self.gk.steps, title=title,
+                         the_class = theClass, the_date = theDate,
+                         the_students = theStudents)
         
     def message(self, ev=None):
         tkm.showinfo("Hallo","Hallo!")
         
     def update_ex_number(self, ev=None):
         n = self.app.exer.sb_exercise_number.get()
+        
+## Durch Evaluation vor Ort / beim Binding nicht mehr nötig        
 #        try:
 #            n = int(n)
 #            self.app.exer.change_entry_widgets(n)
@@ -514,13 +453,23 @@ class Controller():
         namelist = [entry.get() for entry in ex_names]
         pointslist = [entry.get() for entry in ex_points]
 # debugging
-        print("Hier die neuen Listen:")
-        print(namelist)
-        print(pointslist)
+#        print("Hier die neuen Listen:")
+#        print(namelist)
+#        print(pointslist)
         
         self.exercises.fill(listOfNames=namelist, listOfPoints=pointslist)
         self.app.exer.set_max(self.exercises.max)
         self.check_max_values()
+
+        # Fokus weitergeben nach Enter oder Return        
+        if ev != None and (ev.keysym == 'KP_Enter' or ev.keysym == 'Return'):
+            sending_widget = ev.widget
+            sending_widget.event_generate('<<TraverseOut>>')
+            next_widget = sending_widget.tk_focusNext()
+            next_widget.focus()
+            next_widget.event_generate('<<TraverseIn>>')
+        else: 
+            pass
     
     def check_max_values(self, ev=None):
         if self.exercises.max == self.gk.max:
@@ -840,182 +789,7 @@ class PR_ExamConfig(tk.Frame):
         # Eingabefeld für Maximalpunktzahl erhält Fokus
         self.e_max.focus()
 
-class PR_Exercises(tk.Frame):
-    def __init__(self, controller, master=None):
-        super().__init__(master)
-        self.grid(row=0, column=0, sticky="nwse")
-        
-        #self.height = self.master.sashpos()
 
-        #print(self.height)
-        #print(self.width)
-        
-        self.entries_ex = list() # Liste der Aufgabenbezeichnungs-Entries
-        self.entries_ex_values = list()
-        self.entries_p = list()  # Liste der BE-Entries
-        self.entries_p_values = list()
-        
-        self.con = controller    # Bezug zum Controller
-        self.create_widgets()    # Erstellung der Widgets im Frame
-        
-        self.activate_controller() # Controller an Ereignisse binden
-        #self.set_focus()
-    
-    def create_widgets(self):
-        # Titel
-        
-        self.exercise_title = tk.Label(self, text="Aufgabenerfassung", font=myfont)
-        self.exercise_title.grid(row=0, column = 0, sticky = "nwe")
-    
-        # Anzahl der Aufgaben
-        # Frame
-        self.f_exercise_number = tk.Frame(self, bd=2)#, relief=tk.SUNKEN)
-        self.f_exercise_number.grid(row=1, column=0, sticky="nswe")
-        self.l_exercise_number = tk.Label(self.f_exercise_number, text="Aufgabenanzahl:")
-        self.l_exercise_number.grid(row=0, column=0)
-        self.sb_exercise_number = tk.Spinbox(self.f_exercise_number, from_=1, to=20, width=4, justify=tk.CENTER)
-        self.sb_exercise_number.grid(row=0, column=1)
-        self.b_exercise_number = tk.Button(self.f_exercise_number, text="setze")
-        self.b_exercise_number.grid(row=0, column=2)
-        
-        # LabelFrame: Eingabe
-        self.lf_exercise_details = tk.LabelFrame(self, text="Aufgabendetails", cursor="trek",)
-        self.lf_exercise_details.grid(row=2, column=0, sticky="nswe")
-        # Frame: Beschriftungen
-        self.f_exercise_details_labels = tk.Frame(self.lf_exercise_details)
-        self.f_exercise_details_labels.grid(row=0, column=0)
-        
-        # Aufgabeneingabe
-        # Zeilenbschriftungen
-        self.l_exercises = tk.Label(self.f_exercise_details_labels, text="Aufgabenbezeichnung")
-        self.l_exercises.grid(row=0, column=0)
-        self.l_exercises_points = tk.Label(self.f_exercise_details_labels, text="Errechbare BE")
-        self.l_exercises_points.grid(row=1, column=0)
-        
-        # Frame für Platzieren der Canvas
-        self.f_exercises_forCanvas = tk.Frame(self.lf_exercise_details)
-        self.f_exercises_forCanvas.grid(row=0, column=1, sticky="we")
-        
-        # Canvas for Scrolling
-        self.c_exercises = tk.Canvas(self.f_exercises_forCanvas, width=300)
-        self.c_exercises.pack(fill="both")
-        canvas = self.c_exercises
-        
-        # Frame for Scrollbar
-        self.f_exercises_cBottomFrame = tk.Frame(canvas)
-        self.f_exercises_cBottomFrame.pack(side=tk.BOTTOM, fill="x")
-        
-        # Frame: Eingabe
-        self.f_exercise_details_entries = tk.Frame(self.c_exercises, relief=tk.SUNKEN, bd=2, highlightcolor="blue" )
-        self.f_exercise_details_entries.pack(fill="both")
-        entries_f = self.f_exercise_details_entries
-        
-        # Zwei Eingabefelder
-        # Aufgabeneingabe
-        ex1 = tk.StringVar()
-        nameEntry = tk.Entry(entries_f, textvariable=ex1, width=3, bg="yellow", relief=tk.FLAT, bd=2, highlightcolor="blue")
-        nameEntry.grid(row=0, column=0)
-        ex1.set("1")
-        self.entries_ex.append(nameEntry)
-        self.entries_ex_values.append(ex1)
-        
-        # Punkteeingabe
-        ex1_p = tk.IntVar()
-        pointsEntry = tk.Entry(entries_f, textvariable=ex1_p, width=3, bg="white", justify=tk.RIGHT, relief=tk.FLAT, bd=2, highlightcolor="blue")
-        pointsEntry.grid(row=1, column=0) 
-        ex1_p.set(1)
-        self.entries_p.append(pointsEntry)
-        self.entries_p_values.append(ex1_p)
-        
-        # Horizontal Scrollbar
-        self.scrbar_exercises = tk.Scrollbar(self.f_exercises_cBottomFrame, orient=tk.HORIZONTAL, command=canvas.xview)
-        self.scrbar_exercises.pack(fill="x", side=tk.BOTTOM, anchor="w", expand=True)
-        canvas.configure(scrollregion=canvas.bbox('all'),xscrollcommand=self.scrbar_exercises.set)
-        
-        
-        # Berechnete Gesamtpunktzahl
-        # Frame
-        self.f_all_points = tk.Frame(self, bd=2)#, relief=tk.SUNKEN)
-        self.f_all_points.grid(row=3, column=0, sticky="nswe")
-        self.l_all_points = tk.Label(self.f_all_points, text="Gesamtpunktzahl:")
-        self.l_all_points.grid(row=0, column=0)
-        self.max_points = tk.StringVar()
-        self.e_all_points = tk.Entry(self.f_all_points, textvariable=self.max_points, width=4, justify=tk.CENTER, relief=tk.FLAT)
-        self.e_all_points.configure(state=tk.DISABLED, takefocus="NO", disabledforeground = "black", disabledbackground = "yellow")
-        self.e_all_points.grid(row=0, column=1)
-        self.b_all_points = tk.Button(self.f_all_points, text="Übernehmen")
-        self.b_all_points.grid(row=0, column=2)
-        
-    def change_entry_widgets(self, number):
-        entries_f = self.f_exercise_details_entries
-        n = len(self.entries_ex) 
-        
-        if n < number:
-            # Widgets müssen hinzugefügt werden
-            d = number - n
-            for i in range(d):
-                ex = tk.StringVar()
-                nameEntry = tk.Entry(entries_f, textvariable=ex, width=3, bg="yellow", relief=tk.FLAT, bd=2, highlightcolor="blue")
-                nameEntry.grid(row=0, column=n+i)
-                ex.set(str(n+i+1))
-                self.entries_ex.append(nameEntry)
-                self.entries_ex_values.append(ex)
-                
-                ex_p = tk.IntVar()
-                pointsEntry = tk.Entry(entries_f, textvariable=ex_p, width=3, bg="white", justify=tk.RIGHT, relief=tk.FLAT, bd=2, highlightcolor="blue")
-                pointsEntry.grid(row=1, column=n+i) 
-                ex_p.set(1)
-                self.entries_p.append(pointsEntry)
-                self.entries_p_values.append(ex_p)
-        elif n > number:
-            # Widgets müssen entfernt werden
-            while n > number:
-                last = self.entries_ex.pop()
-                last.destroy()
-                del(last)
-                last = self.entries_p.pop()
-                last.destroy()
-                del(last)
-                last = self.entries_ex_values.pop()
-                del(last)
-                last = self.entries_p_values.pop()
-                del(last)
-                n = len(self.entries_ex)
-        else: # n == number
-            pass # Do nothing
-            
-        # Alle Eingabefelder aktivieren    
-        self.activate_controller_on_entries()
-    
-    def activate_controller(self):
-       # self.sb_exercise_number.bind("<Button-1>",  self.con.update_ex_number)
-        self.sb_exercise_number.bind("<KeyRelease-Up>",    self.con.update_ex_number)
-        self.sb_exercise_number.bind("<KeyRelease-Down>",  self.con.update_ex_number)
-        self.sb_exercise_number["command"] = self.con.update_ex_number
-        self.b_exercise_number["command"] = self.con.update_ex_number
-        self.b_all_points["command"] = lambda: self.con.set_max(maxBE=self.con.exercises.get_max())
-        
-        self.activate_controller_on_entries()
-        
-    def activate_controller_on_entries(self):
-        for entry in self.entries_p:
-            vcmd = (entry.register(self.con.vali.validateBE), '%P')
-            entry["validate"]="key"
-            entry["validatecommand"]=vcmd
-            entry.bind("<Return>", self.con.update_ex_points)
-            entry.bind("<Tab>", self.con.update_ex_points)
-            entry.bind("<FocusOut>", self.con.update_ex_points)
-        
-        for entry in self.entries_ex:
-            vcmd = (entry.register(self.con.vali.validateExNames), '%P')
-            entry["validate"]="focusout"
-            entry["validatecommand"]=vcmd
-            entry.bind("<Return>", self.con.update_ex_points)
-            entry.bind("<Tab>", self.con.update_ex_points)
-            entry.bind("<FocusOut>", self.con.update_ex_points)
-        
-    def set_max(self, max_points):
-        self.max_points.set(str(max_points))
         
 
 class MainWindow(tk.PanedWindow):
@@ -1047,9 +821,9 @@ class MainWindow(tk.PanedWindow):
         self.paneconfigure(self.right, sticky="nwse",)
         
         # rechte Hälfte oben: Aufgaben
-        self.exer = PR_Exercises(self.controller, master=self)
+        self.exer = ex.PR_Exercises(self.controller, master=self)
         self.right.add(self.exer)
-        self.right.paneconfigure(self.exer, sticky="nwse", minsize=250)
+        self.right.paneconfigure(self.exer, sticky="nwse", minsize=180)
         
         # rechte Hälfte unten
         self.st = st.Application(parent = self)

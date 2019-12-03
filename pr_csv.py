@@ -5,7 +5,7 @@ class MyCSV():
         self.filename = filename
         
     def write(self, data_list):
-        print("Schreibe in CSV")
+        print("Schreibe in CSV-Datei: {}".format(self.filename))
         
         with open(self.filename, mode='w') as csv_file:
             fieldnames = ['Nachname', 'Vorname', 'Gruppe']

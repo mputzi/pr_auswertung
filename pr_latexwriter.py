@@ -1,6 +1,6 @@
 import matplotlib
 
-from pylatex import Document, Section, Figure, Command, PageStyle, Head, Foot, LineBreak, Tabu, TextColor, Math
+from pylatex import Document, Section, Figure, Command, PageStyle, Head, Foot, LineBreak, Tabu, TextColor, Math, NewPage
 from pylatex.position import Center
 from pylatex.tikz import TikZ
 from pylatex.utils import italic, NoEscape
@@ -10,10 +10,12 @@ matplotlib.use('Agg')  # Not to use X server. For TravisCI.
 import matplotlib.pyplot as plt  # noqa
 
 class LatexW():
-    def __init__(self, maxBE, steplist, title="Titel", the_class="", the_date="", the_ex = {}):
+    def __init__(self, maxBE, steplist, title="Titel", the_class="", the_date="", the_ex = {}, the_students = []):
         self.title = title
         self.myClass = the_class
         self.myDate = the_date
+        self.maxBE = maxBE
+        self.sl = the_students
     # Basic document
         self.doptions = ["a4paper", "oneside", "onecolumn"]
         self.doc = Document(documentclass = 'article', document_options = self.doptions)
@@ -33,9 +35,13 @@ class LatexW():
     # Füllen des Dokuments
         self.generate_header()
         self.create_grade_table(maxBE, steplist)
+        
+        self.create_grade_plot(maxBE, steplist)
+        
+        self.doc.create(NewPage())
+        
         if the_ex != {}:
             self.fill_document(the_ex)
-        self.create_grade_plot(maxBE, steplist)
 
     # Erzeugen der PDF-Datei
         self.doc.generate_pdf('meins', clean_tex=False)
@@ -78,22 +84,57 @@ class LatexW():
         print("Aufgaben übermittelt: {}".format(ex_dict))
         
         ex_list = list(ex_dict.keys())
+        ex_count = len(ex_list)
+
         ex_list.insert(0,"Aufgaben")
-        
-        l = len(ex_list)
-        
-        row_format = "l || " + " | ".join(["c" for i in range(l-1)])
         
         points_list = list(ex_dict.values())
         points_list.insert(0,"BE")
         
-        with doc.create(Center()):
-            with doc.create(Tabu(row_format, row_height = 1.2#,
-                        #to = NoEscape(r".8\textwidth")
-                        )) as betable:
-                betable.add_row(ex_list)
-                betable.add_hline()
-                betable.add_row(points_list)
+        if self.sl == []:
+            row_format = "l || " + " | ".join(["c" for i in range(ex_count)])
+            with doc.create(Center()):
+                
+                with doc.create(Tabu(row_format, row_height = 1.2#,
+                                     #to = NoEscape(r".8\textwidth")
+                                     )) as betable:
+                    betable.add_row(ex_list)
+                    betable.add_hline()
+                    betable.add_row(points_list)
+        else: # Schüler in Liste
+            ex_list.insert(0,"")
+            ex_list.insert(0,"")
+            ex_list.append( Math(inline = True, data =NoEscape(r"\sum")))
+            points_list.insert(0," ")
+            points_list.insert(0," ")
+            points_list.append(Math(inline = True, data =float(self.maxBE)))
+            
+            label_list= ["Nachname","Vorname","Gruppe"]+[" " for i in range(ex_count+1)]
+            
+            #l2 = len(ex_list)
+            row_format = "l l l || " + " | ".join(["c" for i in range(ex_count)]) + "|| r"
+            
+            with doc.create(Center()):
+                with doc.create(Tabu(row_format, row_height = 1.2#,
+                                     #to = NoEscape(r".8\textwidth")
+                                     )) as betable:
+                    betable.add_row(ex_list)
+                    betable.add_hline()
+                    betable.add_row(points_list)
+                    betable.add_hline()
+                    betable.add_hline()
+                    betable.add_row(label_list)
+                    betable.add_hline()
+                    betable.add_hline()
+                    
+                    # Schüler
+                    for s in self.sl:
+                        fn = s.getFamilyName()
+                        n = s.getName()
+                        g = s.getGroup()
+                        s_entry = [fn, n, g] + [" " for i in range(ex_count+1)]
+                        betable.add_row(s_entry)
+                    
         
         #doc = self.doc
    # 
@@ -163,7 +204,7 @@ class LatexW():
             plot.add_plot(width=NoEscape(r"1\textwidth"), dpi=300)
             #plot.add_caption('I am a caption.')
         
-        doc.append("Blubb")
+        #doc.append("Blubb")
         
 #a = LatexW(40, [30,20,10])
 

@@ -9,6 +9,7 @@ Created on Tue Nov 19 16:47:45 2019
 import tkinter as tk 
 import tkinter.ttk as ttk
 from tkinter import messagebox as tkm
+from tkinter import filedialog as tkfd
 
 import pr_csv
 
@@ -58,11 +59,13 @@ class Student():
         return {n : s.name, f : s.family_name, g : s.group}
         
     def setFromList(self, student_list):
+        s = self
         s.group = student_list.pop()
         s.family_name = student_list.pop()
         s.name = student_list.pop()
         
     def setFromDict(self, student_dict):
+        s = self
         s.name = student_dict["Vorname"]
         s.family_name = student_dict["Nachname"]
         s.group = student_dict["Gruppe"]
@@ -569,7 +572,10 @@ class Controller():
 
     def loadStudent(self, event=None):
         print("Laden")
-        c = pr_csv.MyCSV()
+        
+        filename = tkfd.askopenfilename(initialdir = ".", title="Wähle Schülerdatei aus", filetypes = (("CSV-Dateien","*.csv"),("Alle Dateien","*.*")))
+                
+        c = pr_csv.MyCSV(filename)
         result = c.read()
         #print(result)
         
@@ -586,9 +592,27 @@ class Controller():
     
     def saveStudent(self, event=None):
         print("Speichern")
-        c = pr_csv.MyCSV()
-        c.write(self.sl.getList())
-        pass
+        filename = ""
+        
+        try:
+            mainapp = self.app.parent.exam
+            theClass = mainapp.e_class.get()
+            if theClass == "":
+                raise Exception("Keine Klasse angegeben.")
+            else:
+                theDate = mainapp.e_date.get()
+                fn = str(theClass) +" "+ str(theDate)
+                filename = fn.strip().replace(" ","_").replace(".","").lower() + ".csv"
+        except:
+            tkm.showinfo("Fehler bei autom. Dateinamenerzeugung", "Konte den Dateinamen nicht automatisch erzeugen.")
+            filename = "out.csv"
+        
+        try:
+            c = pr_csv.MyCSV(filename)
+            c.write(self.sl.getList())
+            tkm.showinfo("Speichern", "Schülerliste gespeichert unter: {}".format(filename))
+        except:
+            tkm.showerror("Fehler", "Schülerliste konnte nicht gespeichert werden.")
 
 #
 # Main App
@@ -683,11 +707,11 @@ class Application(tk.Frame):
         self.passwordStatus.pack(anchor="e", padx=2)
         self.status.grid(row=4, column=0, sticky="nwse")
         
-        self.parent.bind("o", self.con.loadStudent)
-        self.parent.bind("n", self.con.newStudent)
-        self.parent.bind("e", self.con.editStudent)
-        self.parent.bind("<Delete>", self.con.delStudent)
-        self.parent.bind("<Control-s>", self.con.saveStudent)
+        self.parent.master.bind("<Control-o>", self.con.loadStudent)
+        self.parent.master.bind("<Control-n>", self.con.newStudent)
+        self.parent.master.bind("<Control-e>", self.con.editStudent)
+        self.parent.master.bind("<Control-d>", self.con.delStudent)
+        self.parent.master.bind("<Control-s>", self.con.saveStudent)
         
 
 if __name__ == "__main__":
